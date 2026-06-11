@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 import os
 
-from . import models, schemas, database, parser
+from . import models, schemas, database, parser, ai_service
 from .database import engine, get_db
 
 models.Base.metadata.create_all(bind=engine)
@@ -64,3 +64,32 @@ def get_section(section_id: int, db: Session = Depends(get_db)):
     if db_section is None:
         raise HTTPException(status_code=404, detail="Section not found")
     return db_section
+
+@app.post("/sections/{section_id}/draft", response_model=schemas.Draft)
+async def create_section_draft(section_id: int, provider: str = "openai", db: Session = Depends(get_db)):
+    db_section = db.query(models.Section).filter(models.Section.id == section_id).first()
+    if db_section is None:
+        raise HTTPException(status_code=404, detail="Section not found")
+    
+    # Get full document context
+    db_document = db.query(models.Document).filter(models.Document.id == db_section.document_id).first()
+    full_context = db_document.content if db_document else ""
+    
+    # Generate draft using AI service
+    draft_content = await ai_service.drafting_service.generate_draft(
+        section_title=db_section.title,
+        section_content=db_section.content,
+        full_context=full_context,
+        provider=provider
+    )
+    
+    # Store draft
+    db_draft = models.Draft(
+        section_id=section_id,
+        content=draft_content
+    )
+    db.add(db_draft)
+    db.commit()
+    db.refresh(db_draft)
+    
+    return db_draft
