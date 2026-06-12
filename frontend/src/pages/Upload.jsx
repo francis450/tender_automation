@@ -59,7 +59,7 @@ export default function Upload() {
       const res = await axios.post('/api/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      navigate(`/analysis/${res.data.document_id}`);
+      navigate(`/analysis/${res.data.id}`);
     } catch (err) {
       setError(
         err.response?.data?.detail || 'Upload failed. Please try again.'
